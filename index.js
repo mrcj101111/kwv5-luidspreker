@@ -30,11 +30,9 @@ client.on("message", async message => {
 
     if (message.content.startsWith(`${prefix}play`)) {
         execute(message, serverQueue);
-        message.delete();
         return;
     } else if (message.content.startsWith(`${prefix}skip`)) {
         skip(message, serverQueue);
-        message.delete();
         return;
     } else if (message.content.startsWith(`${prefix}stop`)) {
         stop(message, serverQueue);
@@ -61,7 +59,6 @@ async function execute(message, serverQueue) {
         );
     }
 
-    // const songInfo = await ytdl.getInfo(args[1]);
     const songInfo = await yts(message.content);
     // songInfo.then(data => {
     //     const videos = data.videos.slice(0, 5)
@@ -95,6 +92,7 @@ async function execute(message, serverQueue) {
             var connection = await voiceChannel.join();
             queueContruct.connection = connection;
             play(message.guild, queueContruct.songs[0]);
+            message.channel.messages.fetch().then(data => message.channel.bulkDelete(data))
         } catch (err) {
             console.log(err);
             queue.delete(message.guild.id);
@@ -102,8 +100,15 @@ async function execute(message, serverQueue) {
         }
     } else {
         serverQueue.songs.push(song);
-        return message.channel.send(`${song.title} has been added to the queue!`);
+        message.channel.messages.fetch().then(data => message.channel.bulkDelete(data))
     }
+
+    // Post song names in text channel
+    queue.forEach(songData => {
+        songData.songs.forEach(song => {
+            message.channel.send(song.title)
+        })
+    })
 }
 
 function skip(message, serverQueue) {
@@ -111,9 +116,18 @@ function skip(message, serverQueue) {
         return message.channel.send(
             "You have to be in a voice channel to stop the music!"
         );
-    if (!serverQueue)
+    if (!serverQueue) {
         return message.channel.send("There is no song that I could skip!");
+    }
     serverQueue.connection.dispatcher.end();
+    message.channel.messages.fetch().then(data => message.channel.bulkDelete(data))
+    // Post song names in text channel
+    queue.forEach(songData => {
+        songData.songs.shift()
+        songData.songs.forEach(song => {
+            message.channel.send(song.title)
+        })
+    })
 }
 
 function stop(message, serverQueue) {
@@ -143,8 +157,6 @@ function play(guild, song) {
         })
         .on("error", error => console.error(error));
     dispatcher.setVolumeLogarithmic(serverQueue.volume / 5);
-    // console.log(serverQueue.songs)
-    serverQueue.textChannel.send(`Start playing: **${song.title}**`);
 }
 
 client.login(token);
